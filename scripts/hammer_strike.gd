@@ -72,6 +72,19 @@ func special_shock_spread() -> float:
 	return base_radius * stats.get_v(Stats.CHARGE_RADIUS) * shock_spread \
 		* stats.get_v(Stats.RADIUS_ALL)
 
+## 끌어당김. 바닥에 깔려 잠깐 남는 흡입이라 **area + ground** 다 —
+## '광역화'(area)가 흡입 반경을, '잔류'(ground)가 흡입 시간을 늘린다.
+## ⚠️ 피해 0 이라 '거대화' 계열의 피해 배율은 의미가 없다. 그게 정상이다 (순수 유틸).
+func pull_spec(radius: float) -> ObjectSpec:
+	return object_spec(&"pull_field", GROUND_AREA_TAGS, 0.0, radius)
+
+## 우클릭 끌어당김이 미치는 반경. **맥스 차징 끌어당김과 같은 크기**다 (유저 지시 2026-08-25).
+## ⚠️ special_shock_spread() 와 같은 이유로 특수 직격 반경(6.0)에 곱하지 않는다 —
+##    그러면 차징보다 좁아져서 "궁극기가 더 좁다" 가 된다.
+func special_pull_spread() -> float:
+	return base_radius * stats.get_v(Stats.CHARGE_RADIUS) * pull_spread \
+		* stats.get_v(Stats.RADIUS_ALL)
+
 ## 우클릭 특수 자체. 하늘에서 꽂히는 범위 타격이라 area.
 ## ⚠️ 메아리 망치는 **이 스펙의 repeat** 로 나온다 (모디파이어 '메아리').
 ##    예전엔 '천벌의 메아리' 카드가 echo_level 을 올렸는데, 같은 일을 하는 통로가
@@ -99,6 +112,23 @@ const AREA_TAGS: Array[StringName] = [&"area"]
 @export var shock_spread := 2.4
 @export var shock_damage := 0.35     ## 고리 피해 = 그 스윙 직격의 35%
 @export var shock_knockback := 14.0  ## 대강타(9)보다 세고 특수(22)보다는 약하게
+
+# --- 끌어당김(집결) 카드 -------------------------------------------------------
+## 망치가 지면을 가격하는 **그 순간** 범위 안의 적을 중심으로 끌어온다.
+## 피해는 0 — 순수 유틸이다 (유저 지시 2026-08-25).
+##
+## 왜 착탄 시점인가 (유저 결정): 충격파와 **같은 문법**이 되어야
+##   · '메아리' 가 끌어당김을 그대로 한 번 더 일으키고
+##   · 나중에 슬로우 패턴이 붙으면 끌어당김과 **동시에** 터진다
+## 흡입을 예고/차징 중에 돌리면 저 둘이 어긋나고, '신속한 천벌'(착탄 대기 -0.3초)과도
+## 충돌한다. 착탄 한 점에 모으면 그 충돌이 아예 없어진다.
+@export var has_pull := false
+## 끌어당김 반경 = 그 스윙의 직격 반경 × 이 값. 평타(4)→9.6, 맥스 차징(8)→19.2.
+## 충격파와 같은 배수라 두 카드의 "미치는 범위"가 화면에서 같게 읽힌다.
+@export var pull_spread := 2.4
+## 한 번에 끌려오는 **거리**. 반경이 아니다 — 멀리 있던 적일수록 중심 근처까지 오진 않는다.
+## 장수풍뎅이 같은 무거운 몹은 knockback_resist 만큼 깎여 절반만 온다 (Enemy.pull).
+@export var pull_distance := 6.0
 
 # --- 공격 변화 카드: 여진 (Aftershock) ---
 ## 첫 카드 시험용. UI 가 없으므로 이 체크박스 또는 F1 키로 켠다.
@@ -443,7 +473,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# 개발용 즉시 토글 (정식 획득은 3 키 -> CardUI 카드 선택).
 	# (macOS 에서 F1~F12 는 밝기/볼륨 미디어 키라 쓰면 안 된다)
 	# --- 디버그 키 -----------------------------------------------------------
-	#   1 여진 토글 / 2 불 토글 / 3 천벌의 메아리 레벨 순환 / 4 우클릭 쿨 초기화
+	#   1 여진 토글 / 2 불 토글 / 3 인력 토글 / 4 우클릭 쿨 초기화
 	# 카드가 무작위로 나오게 바뀐 뒤(2026-08-14)로 특정 카드를 기다려서 시험하는 게
 	# 사실상 불가능해졌다. 시험용 통로를 열어 둔다 — 시작할 때 한 번 찍어 준다.
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -454,6 +484,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_2:
 			has_fire = not has_fire
 			print("[card 2] 불 속성(Fire): ", "ON" if has_fire else "OFF")
+			return
+		if event.keycode == KEY_3:
+			has_pull = not has_pull
+			print("[card 3] 인력(Pull): ", "ON" if has_pull else "OFF")
 			return
 		if event.keycode == KEY_4:
 			# 우클릭 쿨타임을 즉시 0 으로 — 예고를 반복해서 보려면 이게 제일 답답한 벽이다.
@@ -652,6 +686,11 @@ func _special_blast(target: Vector3, radius: float,
 		var spec := object_spec(&"shockwave", GROUND_AREA_TAGS,
 			direct * shock_damage * fx_scale, special_shock_spread())
 		_shockwave_object(target, radius, spec)
+
+	# 끌어당김 — 반경은 **맥스 차징과 같다**(유저 지시). 메아리 망치는 fx_scale 만큼
+	# 약하게 끈다 — 충격파가 피해를 그렇게 깎는 것과 같은 이유로 곁다리로 읽혀야 한다.
+	if has_pull:
+		_pull_object(target, pull_spec(special_pull_spread()), fx_scale)
 
 	# 직격 — 그림자 안. 여기 있던 적은 그대로 맞는다.
 	var killed := _damage_area(target, radius, direct, false, 0.0)
@@ -1067,6 +1106,11 @@ func _impact(target: Vector3, ratio := 0.0) -> void:
 		var spec := object_spec(&"shockwave", GROUND_AREA_TAGS,
 			dmg * shock_damage, rad * shock_spread)
 		_shockwave_object(target, rad, spec)
+	# 끌어당김 — 충격파와 **같은 자리, 같은 문법**이다. 착탄 순간 안쪽으로 끈다.
+	# ⚠️ 직격보다 뒤에 있어도 이번 타격에는 영향이 없다 — pull 은 _slide 를 얹을 뿐이라
+	#    실제로 움직이는 건 다음 프레임부터다. 모아둔 값은 **다음 공격과 메아리**가 받는다.
+	if has_pull:
+		_pull_object(target, pull_spec(rad * pull_spread))
 	if has_fire:
 		_deflagrate(killed, ratio)
 
@@ -1490,6 +1534,61 @@ func _shockwave_object(target: Vector3, inner: float, spec: ObjectSpec) -> void:
 			break
 		_shockwave_shot(target, inner, spec.radius, spec,
 			spec.repeat_delay * float(e + 1), spec.repeat_power)
+
+## 끌어당김 — 착탄 순간 범위 안의 적을 중심으로 끈다. 충격파와 **같은 구조**다.
+## count 는 쓰지 않는다: '다중화'가 발사체 전용이라 면적 오브젝트의 count 는 항상 1 이고,
+## 흡입을 여러 겹으로 쪼개면 한 번에 모이는 그림이 흐려진다.
+func _pull_object(target: Vector3, spec: ObjectSpec, power := 1.0) -> void:
+	_pull_shot(target, spec, 0.0, power)
+	# 메아리 — 0.35초 뒤 한 번 더 끈다. 이게 이 카드를 고른 이유의 절반이다(유저).
+	# ⚠️ 깊이 상한을 넘으면 안 나간다. 끌어당김이 끌어당김을 부르면 무한이다.
+	for e in spec.repeat:
+		if spec.child_src(&"pull_echo", spec.repeat_power) == null:
+			break
+		_pull_shot(target, spec, spec.repeat_delay * float(e + 1), spec.repeat_power * power)
+
+func _pull_shot(target: Vector3, spec: ObjectSpec, delay: float, power: float) -> void:
+	var fire := func() -> void:
+		if not is_inside_tree():
+			return
+		_pull_vfx(target, spec.radius, spec.lifetime)
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var enemy := node as Enemy
+			var flat := enemy.global_position - target
+			flat.y = 0.0
+			# hit_radius 를 더해 주는 건 _damage_ring 과 같은 이유다 —
+			# 몸이 큰 적은 중심이 범위 밖이어도 몸통이 걸쳐 있으면 걸려야 한다.
+			if flat.length() > spec.radius + enemy.hit_radius:
+				continue
+			enemy.pull(target, pull_distance * power)
+	if delay <= 0.0:
+		fire.call()
+		return
+	var tw := create_tween()
+	tw.tween_interval(delay)
+	tw.tween_callback(fire)
+
+## 빨려드는 힘줄 연출. 충격파와 **같은 메시**를 쓴다 (지형을 타는 원판, U=거리 V=각도) —
+## 셰이더만 pull.gdshader 로 갈아 끼운 형제다.
+func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0) -> void:
+	var disc := MeshInstance3D.new()
+	disc.mesh = _shockwave_mesh(target, radius)
+	var mat := ShaderMaterial.new()
+	mat.shader = PullShader
+	# ⚠️ 트윈할 유니폼은 미리 심어 둔다 (shockwave 와 같은 함정).
+	mat.set_shader_parameter("t", 0.0)
+	mat.set_shader_parameter("seed", randf() * 40.0)
+	disc.material_override = mat
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(disc)
+	disc.global_position = Terrain.on(target, SHOCK_LIFT)
+	var tw := create_tween()
+	tw.tween_property(mat, "shader_parameter/t", 1.0, PULL_TIME * life_mul)
+	tw.tween_callback(disc.queue_free)
+
+## 흡입 연출 길이. 충격파(SHOCK_TIME)보다 짧다 — 끌림은 한 번에 훅 들어와야 읽힌다.
+const PULL_TIME := 0.42
+const PullShader := preload("res://shaders/pull.gdshader")
 
 func _shockwave_shot(target: Vector3, inner: float, outer: float, spec: ObjectSpec,
 		delay: float, power: float) -> void:

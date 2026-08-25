@@ -937,6 +937,38 @@ func knockback(from: Vector3, power: float) -> void:
 	_air_vel = dir * power * (1.0 - resist) * randf_range(0.8, 1.2) \
 		+ Vector3.UP * power * randf_range(0.55, 0.85)
 
+## 끌어당김 — knockback 의 반대편. 망치가 지면을 가격한 **그 순간** 중심으로 끌려온다.
+## 순수 유틸이라 피해는 없다 (유저 지시 2026-08-25).
+##
+## ⚠️ 넉백과 달리 **띄우지 않는다.** 뜬 적은 공중에서 방향을 잃어 어디로 모였는지 안 읽히고,
+##    착지 산란 때문에 "모았다"가 화면에서 사라진다. 바닥을 끌려오는 게 이 카드의 전부다.
+## ⚠️ 거리를 지정하고 그걸 낼 속도를 역산한다. 속도를 직접 주면 SLIDE_DAMP 를 건드릴 때마다
+##    끌리는 거리가 같이 변해서, 카드 수치가 무관한 상수에 묶인다.
+##    감쇠가 지수라 총 이동거리 ≈ v0 / SLIDE_DAMP → v0 = 거리 × SLIDE_DAMP.
+func pull(to: Vector3, distance: float) -> void:
+	if dying or distance <= 0.0:
+		return
+	var dir := to - global_position
+	dir.y = 0.0
+	var gap := dir.length()
+	if gap < 0.05:
+		return                      # 이미 중심이다 — 밀 방향이 없다
+	dir /= gap
+	# knockback_resist 를 그대로 쓴다. 0 = 온전히 끌려옴, 1 = 절반만 (장수풍뎅이).
+	# 안 끌려오게 막지 않는 건 유저 결정이다 — 탱커도 오되 덜 온다.
+	var resist: float = float(TYPES.get(type_id, {}).get("knockback_resist", 0.0))
+	var d := distance * (1.0 - resist * 0.5)
+	# ⚠️ 중심을 넘어가지 않게 자른다. 넘어가면 반대편으로 튀어나가 오히려 흩어진다 —
+	#    끌어모으는 카드가 적을 퍼뜨리는 그림이 된다.
+	d = minf(d, gap - PULL_MIN_GAP)
+	if d <= 0.0:
+		return
+	_slide += dir * d * SLIDE_DAMP
+	_shake_visual(0.1)
+
+## 끌려와도 이만큼은 중심에서 떨어져 선다. 0 이면 전부 한 점에 겹쳐 한 마리처럼 보인다.
+const PULL_MIN_GAP := 1.2
+
 ## 균열을 처음 밟았을 때. 진행 방향 반대로 한 번 휘청 밀리고 — 그 뒤론 그냥 지나간다.
 func stumble(from: Vector3) -> void:
 	if dying or _airborne:

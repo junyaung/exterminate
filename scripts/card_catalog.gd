@@ -140,6 +140,15 @@ const CARDS: Array[Dictionary] = [
 		flag = &"has_shockwave",
 	},
 	{
+		# 순수 유틸 — 피해가 0 이다. 값은 **다음 공격이 더 걸리는 것**에서 나온다.
+		# 메아리가 붙으면 한 번 더 끌고, 나중에 슬로우 패턴이 붙으면 같은 순간 함께 터진다
+		# (유저 설계 2026-08-25). 그래서 착탄 시점 발동이다.
+		id = &"pull", cname = "인력",
+		desc = "타격한 자리로\n적을 끌어모은다\n무거운 적은 덜 끌린다",
+		cat = "공격 패턴", rarity = &"rare", repeat = false,
+		flag = &"has_pull",
+	},
+	{
 		id = &"fire", cname = "불의 심장", desc = "공격에 불이 깃든다\n여진과 만나면 분화구가 열린다",
 		cat = "속성", rarity = &"rare", repeat = false,
 		flag = &"has_fire",
