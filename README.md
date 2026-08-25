@@ -29,6 +29,9 @@ git clone https://github.com/junyaung/exterminate.git
 Open the folder in Godot 4.7 and press **F5**. No build step, no external dependencies — the
 exported `.glb` models are committed.
 
+Then press **V** to start the assault. Spawning is off until you ask for it, so you get a quiet
+map to look around first — and you can switch it back off at any point to inspect the terrain.
+
 ## Controls
 
 | Input | Action |
@@ -38,6 +41,7 @@ exported `.glb` models are committed.
 | **Right click** | Special — a vertical drop onto the cursor, on its own cooldown |
 | **W A S D** / arrow keys | Pan the camera |
 | **Home** | Recentre on the castle |
+| **V** | Start / stop enemy spawning |
 | **1 – 3** / click | Pick a card during a draft |
 | **R** | Reroll the draft (limited uses) |
 
@@ -49,7 +53,6 @@ one — you cannot get both from a single press.
 
 | Key | Action |
 |---|---|
-| `V` | Toggle enemy spawning |
 | `B` | Summon a boss |
 | `1` / `2` | Toggle the Aftershock / Fire card effects |
 | `4` | Clear the special's cooldown |
@@ -129,9 +132,6 @@ AT=46 PANX=-14 PANZ=-11 OUT=docs/screenshot.png godot --path . --script tools/sh
 
 ## Known issues
 
-- **Enemies do not spawn until you press `V`.** `spawning` defaults to `false` in `scripts/main.gd`
-  — it was a convenience toggle for terrain work and the default was never flipped back. Press `V`
-  after the scene loads, or change the default.
 - Balance is simulated, not play-tested. Nineteen cards per run is a number from `sim_levels.gd`
   under "every insect dies", not from anyone actually finishing a run.
 - `tools/verify_levels.gd` reports a false failure — its card-picking loop does not wait for the
