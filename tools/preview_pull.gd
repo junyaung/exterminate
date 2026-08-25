@@ -33,6 +33,13 @@ func _ready() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/pull.gdshader")
 	mat.set_shader_parameter("seed", 3.0)
+	# VORTEX 를 주면 조합(충격파+인력) 색·감김으로 뽑는다 — hammer_strike._pull_vfx 와 같은 값.
+	if "VORTEX" in OS.get_cmdline_user_args():
+		mat.set_shader_parameter("swirl", 0.62)
+		mat.set_shader_parameter("boost", 1.3)
+		mat.set_shader_parameter("core_col", Color(0.992, 0.820, 0.475))
+		mat.set_shader_parameter("body_col", Color(0.173, 0.910, 0.961))
+		mat.set_shader_parameter("tail_col", Color(0.922, 0.588, 0.380))
 	mesh.material_override = mat
 	add_child(mesh)
 

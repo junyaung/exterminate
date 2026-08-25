@@ -750,7 +750,11 @@ func _physics_process(delta: float) -> void:
 		if global_position.y <= floor_y:
 			global_position.y = floor_y
 			_airborne = false
-			_slide = Vector3(_air_vel.x, 0.0, _air_vel.z) * 0.25   # 착지 후 조금 미끄러진다
+			# ⚠️ **더한다.** 예전엔 `=` 였는데, 그러면 공중에 떠 있는 동안 걸린 이동 효과가
+			#    착지하는 순간 통째로 지워진다. 충격파(띄움) + 인력(끌기)을 같이 쓰면
+			#    잡졸에게 인력이 **아예 안 걸리는** 걸로 나타났다 (2026-08-25 실측:
+			#    인력만 -5.99 / 충격파+인력 +6.34). 앞으로 만들 이동 효과 전부가 같은 함정에 빠진다.
+			_slide += Vector3(_air_vel.x, 0.0, _air_vel.z) * 0.25   # 착지 후 조금 미끄러진다
 		return
 
 	# 밀림은 걷기와 동시에 일어난다 (걸으면서 뒤로 밀리는 느낌)
@@ -936,6 +940,34 @@ func knockback(from: Vector3, power: float) -> void:
 	_airborne = true
 	_air_vel = dir * power * (1.0 - resist) * randf_range(0.8, 1.2) \
 		+ Vector3.UP * power * randf_range(0.55, 0.85)
+
+## 회오리 — **충격파 + 인력** 조합이 만드는 제3의 힘 (유저 결정 2026-08-25).
+## 미는 힘과 당기는 힘이 만나면 남는 건 **접선 방향**이다: 적은 안으로도 밖으로도 아니라
+## 착탄점 **주위를 돈다**. 도는 동안 성으로 가지 못하므로 이 조합이 버는 것은 피해가 아니라 **시간**이다.
+##
+## ⚠️ 순수 접선만 주면 궤도가 점점 벌어져 결국 흩어진다 (미세한 수치 오차가 바깥으로 쌓인다).
+##    안쪽 성분을 조금 섞어 **감기는 나선**으로 만든다 — 보기에도 회오리는 안으로 감긴다.
+func swirl(center: Vector3, arc: float, inward := 0.12) -> void:
+	if dying or arc <= 0.0:
+		return
+	var out := global_position - center
+	out.y = 0.0
+	var gap := out.length()
+	if gap < 0.05:
+		return
+	out /= gap
+	# 접선 = 위 × 바깥. 부호가 도는 방향을 정한다 (전부 같은 방향이라야 회오리로 읽힌다).
+	var tangent := Vector3.UP.cross(out)
+	var resist: float = float(TYPES.get(type_id, {}).get("knockback_resist", 0.0))
+	var d := arc * (1.0 - resist * 0.5)
+	# ⚠️ 접선으로 d 만큼 가면 반경이 **저절로 자란다** (√(r²+d²) − r). 안쪽 성분이 이걸
+	#    먼저 갚지 않으면 궤도가 매 번 벌어져서, 돌리려던 적이 결국 흩어진다
+	#    (실측: inward 0.25 로 8.00 → 8.40). 자라는 만큼을 정확히 빼고, 그 위에
+	#    inward 를 얹어야 "얼마나 감기는가"가 반경과 무관하게 일정해진다.
+	var grow := sqrt(gap * gap + d * d) - gap
+	var pull_in := minf(grow + d * inward, gap - PULL_MIN_GAP)
+	_slide += (tangent * d - out * maxf(pull_in, 0.0)) * SLIDE_DAMP
+	_shake_visual(0.08)
 
 ## 끌어당김 — knockback 의 반대편. 망치가 지면을 가격한 **그 순간** 중심으로 끌려온다.
 ## 순수 유틸이라 피해는 없다 (유저 지시 2026-08-25).

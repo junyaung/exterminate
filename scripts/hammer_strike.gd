@@ -130,6 +130,24 @@ const AREA_TAGS: Array[StringName] = [&"area"]
 ## 장수풍뎅이 같은 무거운 몹은 knockback_resist 만큼 깎여 절반만 온다 (Enemy.pull).
 @export var pull_distance := 6.0
 
+# --- 회오리 = 충격파 + 인력 (조합 자동 발동) -----------------------------------
+## 두 카드를 다 가지면 **밀지도 당기지도 않는다.** 남는 건 접선 방향 — 적이 착탄점 주위를 돈다.
+## 조합이 제3의 효과가 되는 건 이 게임의 규약이다 (여진 + 불 = 분화구와 같은 자리).
+##
+## ⚠️ 이건 취향이 아니라 **버그 수정이기도 하다.** 그냥 두면 넉백이 적을 띄우는 동안
+##    인력이 통째로 버려져서, 잡졸에겐 인력이 없는 것과 같고 탱커에겐 약해진다 —
+##    몹 종류에 따라 결과가 정반대다 (2026-08-25 실측). 힘 하나로 대체하면 그 문제가 사라진다.
+@export var vortex_arc := 5.0        ## 한 번에 도는 호의 길이. 클수록 빠르게 돈다.
+@export var vortex_inward := 0.12    ## 그중 안쪽으로 감기는 비율. 0 이면 궤도가 벌어진다.
+
+func has_vortex() -> bool:
+	return has_shockwave and has_pull
+
+## 고리가 실제로 미는 세기. 회오리일 땐 0 — 미는 힘은 접선으로 **변환됐다**.
+## ⚠️ 고리의 피해는 그대로 남는다. 사라지는 건 넉백뿐이다.
+func shock_knock() -> float:
+	return 0.0 if has_vortex() else shock_knockback
+
 # --- 공격 변화 카드: 여진 (Aftershock) ---
 ## 첫 카드 시험용. UI 가 없으므로 이 체크박스 또는 F1 키로 켠다.
 @export var has_aftershock := false
@@ -689,7 +707,9 @@ func _special_blast(target: Vector3, radius: float,
 
 	# 끌어당김 — 반경은 **맥스 차징과 같다**(유저 지시). 메아리 망치는 fx_scale 만큼
 	# 약하게 끈다 — 충격파가 피해를 그렇게 깎는 것과 같은 이유로 곁다리로 읽혀야 한다.
-	if has_pull:
+	if has_vortex():
+		_vortex_object(target, pull_spec(special_pull_spread()), fx_scale)
+	elif has_pull:
 		_pull_object(target, pull_spec(special_pull_spread()), fx_scale)
 
 	# 직격 — 그림자 안. 여기 있던 적은 그대로 맞는다.
@@ -1109,7 +1129,9 @@ func _impact(target: Vector3, ratio := 0.0) -> void:
 	# 끌어당김 — 충격파와 **같은 자리, 같은 문법**이다. 착탄 순간 안쪽으로 끈다.
 	# ⚠️ 직격보다 뒤에 있어도 이번 타격에는 영향이 없다 — pull 은 _slide 를 얹을 뿐이라
 	#    실제로 움직이는 건 다음 프레임부터다. 모아둔 값은 **다음 공격과 메아리**가 받는다.
-	if has_pull:
+	if has_vortex():
+		_vortex_object(target, pull_spec(rad * pull_spread))
+	elif has_pull:
 		_pull_object(target, pull_spec(rad * pull_spread))
 	if has_fire:
 		_deflagrate(killed, ratio)
@@ -1547,6 +1569,33 @@ func _pull_object(target: Vector3, spec: ObjectSpec, power := 1.0) -> void:
 			break
 		_pull_shot(target, spec, spec.repeat_delay * float(e + 1), spec.repeat_power * power)
 
+## 회오리 — 인력과 **같은 구조**다. 끄는 대신 돌린다.
+func _vortex_object(target: Vector3, spec: ObjectSpec, power := 1.0) -> void:
+	_vortex_shot(target, spec, 0.0, power)
+	for e in spec.repeat:
+		if spec.child_src(&"vortex_echo", spec.repeat_power) == null:
+			break
+		_vortex_shot(target, spec, spec.repeat_delay * float(e + 1), spec.repeat_power * power)
+
+func _vortex_shot(target: Vector3, spec: ObjectSpec, delay: float, power: float) -> void:
+	var fire := func() -> void:
+		if not is_inside_tree():
+			return
+		_pull_vfx(target, spec.radius, spec.lifetime, true)
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var enemy := node as Enemy
+			var flat := enemy.global_position - target
+			flat.y = 0.0
+			if flat.length() > spec.radius + enemy.hit_radius:
+				continue
+			enemy.swirl(target, vortex_arc * power, vortex_inward)
+	if delay <= 0.0:
+		fire.call()
+		return
+	var tw := create_tween()
+	tw.tween_interval(delay)
+	tw.tween_callback(fire)
+
 func _pull_shot(target: Vector3, spec: ObjectSpec, delay: float, power: float) -> void:
 	var fire := func() -> void:
 		if not is_inside_tree():
@@ -1570,7 +1619,7 @@ func _pull_shot(target: Vector3, spec: ObjectSpec, delay: float, power: float) -
 
 ## 빨려드는 힘줄 연출. 충격파와 **같은 메시**를 쓴다 (지형을 타는 원판, U=거리 V=각도) —
 ## 셰이더만 pull.gdshader 로 갈아 끼운 형제다.
-func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0) -> void:
+func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0, vortex := false) -> void:
 	var disc := MeshInstance3D.new()
 	disc.mesh = _shockwave_mesh(target, radius)
 	var mat := ShaderMaterial.new()
@@ -1578,6 +1627,16 @@ func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0) -> void:
 	# ⚠️ 트윈할 유니폼은 미리 심어 둔다 (shockwave 와 같은 함정).
 	mat.set_shader_parameter("t", 0.0)
 	mat.set_shader_parameter("seed", randf() * 40.0)
+	if vortex:
+		# 조합의 색은 **두 카드의 색을 섞은 것**이다 — 충격파의 주황이 인력의 청록에 물든다.
+		# 새 카드가 아니라 "두 개가 합쳐졌다"를 색으로 먼저 읽게 하려는 것이다.
+		mat.set_shader_parameter("swirl", 0.62)      # 확실히 감긴다
+		# ⚠️ boost 를 같이 낮춰야 한다. 1.9 로 두면 심지가 **흰색으로 타서** 색조가 사라지고
+		#    충격파와 구분이 안 된다 (2026-08-25 렌더에서 확인). 조합의 정체성은 색이다.
+		mat.set_shader_parameter("boost", 1.3)
+		mat.set_shader_parameter("core_col", Color(0.992, 0.820, 0.475))  # #fdd179 충격파 심지
+		mat.set_shader_parameter("body_col", Color(0.173, 0.910, 0.961))  # #2ce8f5 인력 몸통
+		mat.set_shader_parameter("tail_col", Color(0.922, 0.588, 0.380))  # #eb9661 충격파 꼬리
 	disc.material_override = mat
 	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(disc)
@@ -1596,7 +1655,7 @@ func _shockwave_shot(target: Vector3, inner: float, outer: float, spec: ObjectSp
 		if not is_inside_tree():
 			return
 		_shockwave(target, 0.0, outer, spec.lifetime)
-		_damage_ring(target, inner, outer, spec.damage * power, shock_knockback * power,
+		_damage_ring(target, inner, outer, spec.damage * power, shock_knock() * power,
 			spec.src)
 	if delay <= 0.0:
 		fire.call()

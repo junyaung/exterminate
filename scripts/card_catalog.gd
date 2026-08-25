@@ -135,7 +135,7 @@ const CARDS: Array[Dictionary] = [
 	{
 		# 줄당 15자 한계 — 여진 카드 주석 참고.
 		id = &"shockwave", cname = "충격파",
-		desc = "평타에서 고리가 퍼져\n바깥의 적을 밀어내며 깎는다",
+		desc = "고리가 퍼져 바깥의 적을\n밀어내며 깎는다\n인력과 만나면 회오리",
 		cat = "공격 패턴", rarity = &"rare", repeat = false,
 		flag = &"has_shockwave",
 	},
@@ -144,7 +144,7 @@ const CARDS: Array[Dictionary] = [
 		# 메아리가 붙으면 한 번 더 끌고, 나중에 슬로우 패턴이 붙으면 같은 순간 함께 터진다
 		# (유저 설계 2026-08-25). 그래서 착탄 시점 발동이다.
 		id = &"pull", cname = "인력",
-		desc = "타격한 자리로\n적을 끌어모은다\n무거운 적은 덜 끌린다",
+		desc = "타격한 자리로 끌어모은다\n무거운 적은 덜 끌린다\n충격파와 만나면 회오리",
 		cat = "공격 패턴", rarity = &"rare", repeat = false,
 		flag = &"has_pull",
 	},
