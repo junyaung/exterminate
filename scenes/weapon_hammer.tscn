@@ -1,0 +1,43 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/hammer.glb" id="1_model"]
+[ext_resource type="Shader" path="res://shaders/cel.gdshader" id="2_cel"]
+
+[sub_resource type="ShaderMaterial" id="Mat_wood"]
+shader = ExtResource("2_cel")
+shader_parameter/light_tone = Color(0.949, 0.722, 0.533, 1)
+shader_parameter/dark_tone = Color(0.647, 0.471, 0.333, 1)
+shader_parameter/threshold = 0.73
+
+[sub_resource type="ShaderMaterial" id="Mat_stone"]
+shader = ExtResource("2_cel")
+shader_parameter/light_tone = Color(0.733, 0.765, 0.816, 1)
+shader_parameter/dark_tone = Color(0.388, 0.4, 0.388, 1)
+shader_parameter/threshold = 0.37
+
+[sub_resource type="StandardMaterial3D" id="Mat_border_wood"]
+shading_mode = 0
+albedo_color = Color(0.451, 0.298, 0.267, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_border_stone"]
+shading_mode = 0
+albedo_color = Color(0.239, 0.2, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+shading_mode = 0
+albedo_color = Color(0.239, 0.2, 0.2, 1)
+cull_mode = 2
+
+[node name="WeaponHammer" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="Body" parent="Model" index="0"]
+surface_material_override/0 = SubResource("Mat_wood")
+surface_material_override/1 = SubResource("Mat_stone")
+
+[node name="Outline" parent="Model" index="1"]
+cast_shadow = 0
+surface_material_override/0 = SubResource("Mat_border_wood")
+surface_material_override/1 = SubResource("Mat_border_stone")
+surface_material_override/2 = SubResource("Mat_ink")

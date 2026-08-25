@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/boss.gd" id="1_boss"]
+[ext_resource type="PackedScene" path="res://assets/models/stag.glb" id="2_stag"]
+
+[node name="Boss" type="Node3D"]
+script = ExtResource("1_boss")
+base_health = 7500.0
+base_attack_range = 12.0
+type_id = &"stag"
+
+[node name="VisualPivot" type="Node3D" parent="."]
+
+[node name="Stag" parent="VisualPivot" instance=ExtResource("2_stag")]
+transform = Transform3D(0, 0, 0.36, 0, 0.36, 0, -0.36, 0, 0, 0, 0, 0)

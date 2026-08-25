@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://ljkewayy3088"
+
+[deps]
+
+files=["res://tools/sim_result.act.translation", "res://tools/sim_result.kills.translation", "res://tools/sim_result.spawned.translation", "res://tools/sim_result.leak.translation", "res://tools/sim_result.alive.translation", "res://tools/sim_result.base.translation"]
+
+source_file="res://tools/sim_result.csv"
+dest_files=["res://tools/sim_result.act.translation", "res://tools/sim_result.kills.translation", "res://tools/sim_result.spawned.translation", "res://tools/sim_result.leak.translation", "res://tools/sim_result.alive.translation", "res://tools/sim_result.base.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

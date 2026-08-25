@@ -1,0 +1,147 @@
+[gd_scene format=3 uid="uid://dgsf4v0t4k8f2"]
+
+[ext_resource type="Script" uid="uid://cmbiyrp6qydhp" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://rs345tc4m2ot" path="res://scripts/base_block.gd" id="2_base"]
+[ext_resource type="PackedScene" path="res://scenes/weapon_hammer.tscn" id="3_hammer"]
+[ext_resource type="Script" uid="uid://dgn6bwwb0lqfi" path="res://scripts/hammer_strike.gd" id="4_strike"]
+[ext_resource type="Shader" uid="uid://bhudd4qm1jk0o" path="res://shaders/range_indicator.gdshader" id="5_ring"]
+[ext_resource type="Script" uid="uid://1x5jc8jp1c1e" path="res://scripts/card_ui.gd" id="6_cards"]
+[ext_resource type="Script" uid="uid://dkrepxbm02368" path="res://scripts/xp_bar.gd" id="7_xpbar"]
+[ext_resource type="Script" uid="uid://cqlggcpec5esu" path="res://scripts/card_shelf.gd" id="8_shelf"]
+[ext_resource type="Script" uid="uid://dhyx7l365pfpr" path="res://scripts/boss_bar.gd" id="9_bossbar"]
+[ext_resource type="Script" uid="uid://b3auffgd2xh6h" path="res://scripts/ground.gd" id="10_ground"]
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 1
+background_color = Color(0.537, 0.643, 0.467, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.353, 0.427, 0.588, 1)
+ambient_light_energy = 0.55
+glow_enabled = true
+glow_intensity = 0.9
+glow_blend_mode = 0
+glow_hdr_threshold = 1.1
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.388, 0.78, 0.302, 1)
+metallic_specular = 0.0
+
+[sub_resource type="PlaneMesh" id="Mesh_ground"]
+material = SubResource("Mat_ground")
+size = Vector2(400, 400)
+
+[sub_resource type="StandardMaterial3D" id="Mat_base"]
+albedo_color = Color(0.945, 0.965, 0.941, 1)
+metallic_specular = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_base"]
+material = SubResource("Mat_base")
+size = Vector3(5, 4, 5)
+
+[sub_resource type="ShaderMaterial" id="Mat_ring"]
+render_priority = 0
+shader = ExtResource("5_ring")
+shader_parameter/col = Color(0.969, 0.463, 0.133, 1)
+shader_parameter/dash_count = 28.0
+shader_parameter/ring_width = 0.07
+shader_parameter/fill_alpha = 0.1
+shader_parameter/spin_speed = 0.05
+shader_parameter/alpha_mul = 1.0
+shader_parameter/aim_r = 0.86
+shader_parameter/cd_gap = 0.05
+shader_parameter/cd_width = 0.06
+shader_parameter/cd_col = Color(0.71, 0.349, 0.271, 1)
+shader_parameter/cd_ratio = 1.0
+shader_parameter/cd_ready_alpha = 0.5
+shader_parameter/terrain_half = 160.0
+shader_parameter/lift = 0.06
+shader_parameter/conform = false
+
+[sub_resource type="PlaneMesh" id="Mesh_ring"]
+
+[node name="Main" type="Node3D" unique_id=349532263]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=725969858]
+environment = SubResource("Env_1")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1321350159]
+transform = Transform3D(-0.10452851, -0.761848, 0.6392664, 0, 0.64278764, 0.76604444, -0.9945219, 0.08007348, -0.067189634, 0, 25, 0)
+light_energy = 1.35
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 302.0
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=2060914980]
+transform = Transform3D(0.70710677, -0.5416752, 0.45451948, 0, 0.64278764, 0.76604444, -0.70710677, -0.5416752, 0.45451948, 29.88366, 50.36575, 29.88366)
+projection = 1
+size = 75.5
+near = 0.1
+far = 500.0
+
+[node name="Ground" type="MeshInstance3D" parent="." unique_id=1280534375]
+mesh = SubResource("Mesh_ground")
+script = ExtResource("10_ground")
+
+[node name="BaseBlock" type="Node3D" parent="." unique_id=2122715607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.355, 0, 0)
+script = ExtResource("2_base")
+
+[node name="Mesh" type="MeshInstance3D" parent="BaseBlock" unique_id=888459776]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+mesh = SubResource("Mesh_base")
+
+[node name="HammerStrike" type="Node3D" parent="." unique_id=814014575]
+script = ExtResource("4_strike")
+
+[node name="Indicator" type="MeshInstance3D" parent="HammerStrike" unique_id=342827169]
+material_override = SubResource("Mat_ring")
+cast_shadow = 0
+mesh = SubResource("Mesh_ring")
+
+[node name="WeaponHammer" parent="HammerStrike" unique_id=1252033320 instance=ExtResource("3_hammer")]
+visible = false
+
+[node name="Enemies" type="Node3D" parent="." unique_id=825647519]
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=473123519]
+
+[node name="Status" type="Label" parent="HUD" unique_id=1814049419]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -420.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = 190.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.078, 0.137, 0.227, 1)
+theme_override_font_sizes/font_size = 22
+text = "BASE"
+horizontal_alignment = 2
+
+[node name="XpBar" type="Control" parent="HUD" unique_id=1590233801]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("7_xpbar")
+
+[node name="BossBar" type="Control" parent="HUD" unique_id=1590233803]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("9_bossbar")
+
+[node name="CardUI" type="CanvasLayer" parent="." unique_id=938201744]
+script = ExtResource("6_cards")
+
+[node name="CardShelf" type="CanvasLayer" parent="." unique_id=1590233802]
+script = ExtResource("8_shelf")

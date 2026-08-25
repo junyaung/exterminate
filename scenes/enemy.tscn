@@ -1,0 +1,39 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="1_enemy"]
+[ext_resource type="PackedScene" path="res://assets/models/ant.glb" id="2_ant"]
+[ext_resource type="PackedScene" path="res://assets/models/pillbug.glb" id="3_pill"]
+[ext_resource type="PackedScene" path="res://assets/models/rhino.glb" id="4_rhino"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_blob"]
+albedo_color = Color(0.169, 0.227, 0.333, 1)
+roughness = 1.0
+metallic_specular = 0.0
+
+[sub_resource type="SphereMesh" id="Mesh_blob"]
+material = SubResource("Mat_blob")
+radius = 0.6
+height = 1.2
+radial_segments = 10
+rings = 5
+
+[node name="Enemy" type="Node3D"]
+script = ExtResource("1_enemy")
+
+[node name="VisualPivot" type="Node3D" parent="."]
+
+[node name="Ant" parent="VisualPivot" instance=ExtResource("2_ant")]
+transform = Transform3D(0, 0, 0.5301, 0, 0.5301, 0, -0.5301, 0, 0, 0, 0, 0)
+
+[node name="Pillbug" parent="VisualPivot" instance=ExtResource("3_pill")]
+transform = Transform3D(0, 0, 0.9981, 0, 0.9981, 0, -0.9981, 0, 0, 0, 0, 0)
+visible = false
+
+[node name="Rhino" parent="VisualPivot" instance=ExtResource("4_rhino")]
+transform = Transform3D(0, 0, 0.5634, 0, 0.5634, 0, -0.5634, 0, 0, 0, 0, 0)
+visible = false
+
+[node name="Blob" type="MeshInstance3D" parent="VisualPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+visible = false
+mesh = SubResource("Mesh_blob")
