@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://dgsf4v0t4k8f2"]
 
+[ext_resource type="Script" path="res://scripts/shadow_pool.gd" id="shadow_pool"]
 [ext_resource type="Script" uid="uid://cmbiyrp6qydhp" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://rs345tc4m2ot" path="res://scripts/base_block.gd" id="2_base"]
 [ext_resource type="PackedScene" path="res://scenes/weapon_hammer.tscn" id="3_hammer"]
@@ -103,6 +104,9 @@ mesh = SubResource("Mesh_ring")
 visible = false
 
 [node name="Enemies" type="Node3D" parent="." unique_id=825647519]
+
+[node name="ShadowPool" type="MultiMeshInstance3D" parent="." groups=["shadow_pool"]]
+script = ExtResource("shadow_pool")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=473123519]
 

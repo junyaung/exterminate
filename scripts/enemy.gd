@@ -397,7 +397,6 @@ const SHADOW_FIT := 0.80      ## 발자국 대비 타원 크기. 1.0 이면 다�
 ##    AABB 를 그대로 쓰면 공중에 뜬 뿔까지 그림자가 깔려 "거대한 타원 위에 앉은 벌레"가 된다.
 const SHADOW_LEN_CAP := 1.2
 
-var _ground_shadow: MeshInstance3D
 
 ## 유닛 발밑 타원. 모델 종류를 묻지 않고 **실제 메시 발자국**에서 크기를 뽑는다 —
 ## 그래야 크기 배율을 바꿔도(헤비 4.48, 러너 1.2) 따로 손볼 곳이 없다.
@@ -417,22 +416,23 @@ func _add_ground_shadow(model: Node3D) -> void:
 		return
 	var w := hi.x - lo.x
 	var l := minf(hi.y - lo.y, w * SHADOW_LEN_CAP)
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(w, l) * SHADOW_FIT
-	var m := ShaderMaterial.new()
-	m.shader = DropShadowShader
-	m.set_shader_parameter("col", SHADOW_COL)
-	m.set_shader_parameter("strength", SHADOW_STRENGTH)
-	plane.material = m
-	_ground_shadow = MeshInstance3D.new()
-	_ground_shadow.name = "GroundShadow"
-	_ground_shadow.mesh = plane
-	_ground_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# ⚠️ VisualPivot 이 아니라 **루트**에 붙인다. 피벗은 사망 스쿼시로 눌리고 폭연으로 떠오르는데,
-	#    그걸 따라가면 그림자가 지면에서 분리돼 공중에 뜬다.
-	#    중심을 (0,0) 으로 두는 것도 같은 이유 — 모델 원점이 곧 몸 중심이라 뿔·머리로 안 쏠린다.
-	add_child(_ground_shadow)
-	_ground_shadow.position = Vector3(0.0, SHADOW_Y, 0.0)
+	# ⚠️ 예전엔 몹마다 MeshInstance3D 를 하나씩 달았다. 개미가 수백 마리라 그것만으로
+	#    씬 인스턴스의 25% 였고 렌더러가 그걸 전부 제출하느라 후반 웨이브가 무너졌다.
+	#    지금은 ShadowPool(MultiMesh) 하나가 전부 그린다 — 룩은 같다.
+	# ⚠️ 몹 **루트**의 변환을 따라간다 (VisualPivot 이 아니라). 피벗은 사망 스쿼시로 눌리고
+	#    폭연으로 떠오르는데, 그걸 따라가면 그림자가 지면에서 분리돼 공중에 뜬다.
+	var pool = shadow_pool()      # ⚠️ 타입을 적지 않는다 — ShadowPool 을 타입으로 쓰면 순환 참조다
+	if pool != null:
+		pool.add(self, w * SHADOW_FIT, l * SHADOW_FIT)
+
+## 접지 타원 풀. 그룹에서 한 번 찾아 캐시한다 — 몹마다 그룹을 뒤지면 그게 비용이다.
+static var _pool_cached: Node
+
+func shadow_pool() -> Node:
+	if _pool_cached != null and is_instance_valid(_pool_cached):
+		return _pool_cached
+	_pool_cached = get_tree().get_first_node_in_group(&"shadow_pool")
+	return _pool_cached
 
 func _shadow_meshes(n: Node) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
