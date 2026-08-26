@@ -31,8 +31,19 @@ func _ready() -> void:
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = _disc(RADIUS)
 	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/pull.gdshader")
+	# MAGNET 를 주면 새 쌍극자 자기장 셰이더로 뽑는다 (인력 v2 테스트).
+	mat.shader = load("res://shaders/magnet.gdshader") \
+		if "MAGNET" in OS.get_cmdline_user_args() \
+		else load("res://shaders/pull.gdshader")
 	mat.set_shader_parameter("seed", 3.0)
+	# 색 후보 비교용 — CORE=#2ce8f5 GLOW=#0099db 처럼 넘긴다.
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("CORE="):
+			mat.set_shader_parameter("line_col", Color(a.substr(5)))
+		elif a.begins_with("BOOST="):
+			mat.set_shader_parameter("boost", a.substr(6).to_float())
+		elif a.begins_with("GLOW="):
+			mat.set_shader_parameter("glow_col", Color(a.substr(5)))
 	# VORTEX 를 주면 조합(충격파+인력) 색·감김으로 뽑는다 — hammer_strike._pull_vfx 와 같은 값.
 	if "VORTEX" in OS.get_cmdline_user_args():
 		mat.set_shader_parameter("swirl", 0.62)

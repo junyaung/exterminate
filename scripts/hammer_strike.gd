@@ -1623,7 +1623,7 @@ func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0, vortex := false)
 	var disc := MeshInstance3D.new()
 	disc.mesh = _shockwave_mesh(target, radius)
 	var mat := ShaderMaterial.new()
-	mat.shader = PullShader
+	mat.shader = PullShader if vortex else MagnetShader
 	# ⚠️ 트윈할 유니폼은 미리 심어 둔다 (shockwave 와 같은 함정).
 	mat.set_shader_parameter("t", 0.0)
 	mat.set_shader_parameter("seed", randf() * 40.0)
@@ -1641,13 +1641,28 @@ func _pull_vfx(target: Vector3, radius: float, life_mul := 1.0, vortex := false)
 	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(disc)
 	disc.global_position = Terrain.on(target, SHOCK_LIFT)
+	if not vortex and magnet_random_axis:
+		# 판은 **땅과 평행**하게 눕혀 둔다 (유저 지시 2026-08-25) — 세웠더니 방향에 따라
+		# 카메라에 옆면으로 서서 선 하나로 뭉개졌다. 눕히면 어느 방향이든 같은 기울기로 보인다.
+		mat.set_shader_parameter("axis_v", randf())
 	var tw := create_tween()
-	tw.tween_property(mat, "shader_parameter/t", 1.0, PULL_TIME * life_mul)
+	tw.tween_property(mat, "shader_parameter/t", 1.0,
+		(PULL_TIME if vortex else MAGNET_TIME) * life_mul)
 	tw.tween_callback(disc.queue_free)
 
 ## 흡입 연출 길이. 충격파(SHOCK_TIME)보다 짧다 — 끌림은 한 번에 훅 들어와야 읽힌다.
 const PULL_TIME := 0.42
+## 자기장(인력 단독)은 **고리가 하나씩 차례로** 빨려들어야 해서 나선보다 길어야 한다.
+## 0.42 로 두면 마지막 고리가 출발하기도 전에 끝난다.
+const MAGNET_TIME := 0.62
+## 자기장 축 방향을 매 시전마다 무작위로 돌린다. 항상 같은 축이면 스킬이 한 장면으로 굳는다.
+## ⚠️ 노드를 돌리지 않고 **셰이더의 axis_v** 로 돌린다 — 지형 높이가 구워진 메시를 회전시키면
+##    높이가 엉뚱한 자리에 얹혀 판이 뒤틀린다.
+@export var magnet_random_axis := true
 const PullShader := preload("res://shaders/pull.gdshader")
+## 인력 단독은 **뿜어져 나오는 쌍극자 자기장**이다 (유저 지시 2026-08-25).
+## 빨려드는 나선(PullShader)은 회오리 조합이 가져갔다 — 둘이 같은 그림이면 조합이 안 읽힌다.
+const MagnetShader := preload("res://shaders/magnet.gdshader")
 
 func _shockwave_shot(target: Vector3, inner: float, outer: float, spec: ObjectSpec,
 		delay: float, power: float) -> void:
