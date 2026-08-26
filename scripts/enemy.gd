@@ -945,9 +945,10 @@ func knockback(from: Vector3, power: float) -> void:
 ## 미는 힘과 당기는 힘이 만나면 남는 건 **접선 방향**이다: 적은 안으로도 밖으로도 아니라
 ## 착탄점 **주위를 돈다**. 도는 동안 성으로 가지 못하므로 이 조합이 버는 것은 피해가 아니라 **시간**이다.
 ##
-## ⚠️ 순수 접선만 주면 궤도가 점점 벌어져 결국 흩어진다 (미세한 수치 오차가 바깥으로 쌓인다).
-##    안쪽 성분을 조금 섞어 **감기는 나선**으로 만든다 — 보기에도 회오리는 안으로 감긴다.
-func swirl(center: Vector3, arc: float, inward := 0.12) -> void:
+## ⚠️ `inward` 는 비율이 아니라 **거리**다. 회오리는 인력과 **똑같이 중심까지 끌어온다**
+##    (유저 지시 2026-08-25) — 돌기만 하고 안 모이면 조합이 인력보다 약해진다.
+##    도는 건 연출이고, 모으는 건 인력이 하던 일 그대로다.
+func swirl(center: Vector3, arc: float, inward: float) -> void:
 	if dying or arc <= 0.0:
 		return
 	var out := global_position - center
@@ -959,14 +960,17 @@ func swirl(center: Vector3, arc: float, inward := 0.12) -> void:
 	# 접선 = 위 × 바깥. 부호가 도는 방향을 정한다 (전부 같은 방향이라야 회오리로 읽힌다).
 	var tangent := Vector3.UP.cross(out)
 	var resist: float = float(TYPES.get(type_id, {}).get("knockback_resist", 0.0))
-	var d := arc * (1.0 - resist * 0.5)
-	# ⚠️ 접선으로 d 만큼 가면 반경이 **저절로 자란다** (√(r²+d²) − r). 안쪽 성분이 이걸
-	#    먼저 갚지 않으면 궤도가 매 번 벌어져서, 돌리려던 적이 결국 흩어진다
-	#    (실측: inward 0.25 로 8.00 → 8.40). 자라는 만큼을 정확히 빼고, 그 위에
-	#    inward 를 얹어야 "얼마나 감기는가"가 반경과 무관하게 일정해진다.
-	var grow := sqrt(gap * gap + d * d) - gap
-	var pull_in := minf(grow + d * inward, gap - PULL_MIN_GAP)
-	_slide += (tangent * d - out * maxf(pull_in, 0.0)) * SLIDE_DAMP
+	var soften := 1.0 - resist * 0.5
+	# ⚠️ 도착할 반경을 **직접 푼다.** 접선으로 옆으로 가면 거리가 다시 벌어지므로
+	#    "안쪽으로 얼마" 를 그냥 빼면 실제로는 덜 모인다 (실측: 8.00 에서 6 을 끌었는데
+	#    5.14 에서 멈췄다 — 기대는 2.00). 최종 위치가 out·(gap−p) + tangent·d 이므로
+	#    (gap−p)² + d² = target² 을 p 에 대해 풀면 정확히 그 반경에 앉는다.
+	var target := maxf(gap - inward * soften, PULL_MIN_GAP)
+	# 접선 이동이 목표 반경보다 크면 그 자리에 앉을 방법이 없다 — 접선을 줄인다.
+	# 중심 가까이 있는 적만 해당하고, 멀리 있는 적이 도는 양은 그대로다.
+	var d := minf(arc * soften, target)
+	var pull_in := gap - sqrt(maxf(target * target - d * d, 0.0))
+	_slide += (tangent * d - out * pull_in) * SLIDE_DAMP
 	_shake_visual(0.08)
 
 ## 끌어당김 — knockback 의 반대편. 망치가 지면을 가격한 **그 순간** 중심으로 끌려온다.

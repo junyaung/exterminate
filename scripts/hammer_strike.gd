@@ -138,7 +138,8 @@ const AREA_TAGS: Array[StringName] = [&"area"]
 ##    인력이 통째로 버려져서, 잡졸에겐 인력이 없는 것과 같고 탱커에겐 약해진다 —
 ##    몹 종류에 따라 결과가 정반대다 (2026-08-25 실측). 힘 하나로 대체하면 그 문제가 사라진다.
 @export var vortex_arc := 5.0        ## 한 번에 도는 호의 길이. 클수록 빠르게 돈다.
-@export var vortex_inward := 0.12    ## 그중 안쪽으로 감기는 비율. 0 이면 궤도가 벌어진다.
+## ⚠️ 안쪽으로 끄는 거리는 따로 두지 않는다 — **인력과 같은 pull_distance** 를 쓴다.
+##    조합이 원본보다 덜 모으면 두 장을 먹을 이유가 없다 (유저 지시 2026-08-25).
 
 func has_vortex() -> bool:
 	return has_shockwave and has_pull
@@ -1588,7 +1589,7 @@ func _vortex_shot(target: Vector3, spec: ObjectSpec, delay: float, power: float)
 			flat.y = 0.0
 			if flat.length() > spec.radius + enemy.hit_radius:
 				continue
-			enemy.swirl(target, vortex_arc * power, vortex_inward)
+			enemy.swirl(target, vortex_arc * power, pull_distance * power)
 	if delay <= 0.0:
 		fire.call()
 		return

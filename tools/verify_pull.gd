@@ -74,19 +74,35 @@ func _run() -> void:
 
 	# --- 회오리 ---------------------------------------------------------------
 	print("")
-	print("회오리: 중심에서 8.0 인 적을 호 5.0 / 안쪽 0.12 로 돌린다")
+	print("회오리: 중심에서 8.0 인 적을 호 5.0 / 안쪽 %.1f 로 돌린다 (인력과 같은 거리)" % dist)
 	var orb := _spawn(&"grunt", Vector3(8.0, 0.0, 0.0))
 	await process_frame
 	var before := orb.global_position
-	orb.swirl(center, 5.0, 0.12)
+	orb.swirl(center, 5.0, dist)
 	await _settle(1.5)
 	var after := orb.global_position
 	after.y = 0.0
 	var moved_arc := absf(after.z - before.z)
 	print("  접선 이동 %5.2f  (돌아야 하므로 0 이 아니어야)" % moved_arc)
-	print("  중심거리 8.00 -> %5.2f  (조금만 줄어야 — 흩어지지도 빨려들지도 않는다)"
-		% after.length())
-	print("  궤도 유지: ", "OK" if after.length() > 5.5 and moved_arc > 1.0 else "실패")
+	print("  중심거리 8.00 -> %5.2f  (인력처럼 %.2f 만큼 줄어야)" % [after.length(), dist])
+	print("  인력만큼 모였는가: ",
+		"OK" if absf(after.length() - (8.0 - dist)) < 0.6 else "실패")
+	print("  돌기도 하는가: ", "OK" if moved_arc > 1.0 else "실패")
+
+	# 멀리 있는 적은 도는 양이 깎이지 않아야 한다 (접선 축소는 중심 근처에서만 일어난다)
+	print("")
+	print("먼 적: 중심에서 20.0 인 적을 호 5.0 / 안쪽 %.1f" % dist)
+	var far := _spawn(&"grunt", Vector3(20.0, 0.0, 0.0))
+	await process_frame
+	var f0 := far.global_position
+	far.swirl(center, 5.0, dist)
+	await _settle(1.5)
+	var f1 := far.global_position
+	f1.y = 0.0
+	print("  접선 이동 %5.2f  (5.00 그대로여야)" % absf(f1.z - f0.z))
+	print("  중심거리 20.00 -> %5.2f  (기대 %.2f)" % [f1.length(), 20.0 - dist])
+	print("  둘 다 만족: ", "OK" if absf(f1.length() - (20.0 - dist)) < 0.6 \
+		and absf(absf(f1.z - f0.z) - 5.0) < 0.6 else "실패")
 	quit()
 
 func _init() -> void:
