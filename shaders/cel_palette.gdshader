@@ -6,7 +6,10 @@
 // 되어 웨이브 5부터 프레임이 무너졌다 (2026-08-25 실측: 190마리 60fps -> 290마리 22fps).
 // 색을 정점에 실으면 부위가 몇 개든 **머티리얼 하나**로 합쳐진다.
 //
-// 정점 규약: COLOR.r × 255 = 팔레트 칸 번호. 블렌더 익스포터가 부위마다 심어 준다.
+// 정점 규약: COLOR.r = (칸번호 + 0.5) / 8. 블렌더 익스포터가 부위마다 심어 준다.
+// ⚠️ 1/255 간격으로 실으면 안 된다 — 블렌더 BYTE_COLOR 는 sRGB 로 저장돼 작은 값들이
+//    양자화 충돌을 일으킨다 (실측: 칸 7개 중 3·6번이 다른 칸과 같은 값이 되어 사라졌다).
+//    FLOAT_COLOR + 1/8 간격이면 glTF 가 8비트로 구워도 오차가 간격의 3%라 안전하다.
 // ⚠️ light() 안에서 varying 을 읽는다. 예전에 "막힐 수 있다"고 적어 둔 적이 있는데
 //    (ground_cel.gdshader 머리말), 4.7 Forward Mobile 에서 실측하니 정상 동작한다.
 //    막히는 쪽은 그때 헤드리스라 셰이더가 아예 컴파일되지 않았던 것으로 보인다.
@@ -31,7 +34,7 @@ uniform float pal_threshold[PAL];
 varying flat float v_slot;
 
 void vertex() {
-	v_slot = COLOR.r * 255.0;
+	v_slot = floor(COLOR.r * 8.0);
 }
 
 // 폭연 예열. 0 = 평소(기존 룩 그대로), 1 = 금색으로 달아올라 bloom 문턱(1.1)을 넘는다.
@@ -68,7 +71,7 @@ void fragment() {
 }
 
 void light() {
-	int i = clamp(int(v_slot + 0.5), 0, PAL - 1);
+	int i = clamp(int(v_slot), 0, PAL - 1);
 	float ndl = dot(normalize(NORMAL), normalize(LIGHT));
 	// ATTENUATION 에 그림자가 들어있어, 그림자 진 곳도 어두운 밴드로 딱 떨어진다.
 	float lit = step(pal_threshold[i], ndl * ATTENUATION);

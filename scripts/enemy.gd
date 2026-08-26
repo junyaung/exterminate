@@ -250,6 +250,44 @@ static func rhino_slot_of(mat_name: String) -> int:
 ## ⚠️ 보스(사슴벌레)의 네이비+금과 겹치지 않게 갈색·자두 계열로 묶었다.
 static var _rhino_mats: Array = []
 
+## 장수풍뎅이 **팔레트판** — rhino_materials() 와 색표가 같고, 부위별 머티리얼 대신
+## 정점이 지목하는 칸으로 넘긴다. 표면 15 -> 2 (드로우콜이 그만큼 준다).
+##
+## ⚠️ 4·5·6 은 원래 unshaded(먹선·흰자·동공) 였다. 팔레트는 셀 밴딩을 하므로
+##    **밝음 = 어두움**으로 넣어 평면색을 유지한다 — 밴딩이 안 생긴다.
+##    다만 시간대 색조(mood_tint)는 이제 이 칸들에도 걸린다. 눈·먹선이 밤에 같이
+##    가라앉는 쪽이 오히려 일관적이라 그대로 둔다 (유저 확인 2026-08-25).
+const RHINO_PAL: Array = [
+	[Color(0.243, 0.153, 0.192), INK, 0.17],                          # 0 딱지날개
+	[Color(0.761, 0.522, 0.412), Color(0.451, 0.243, 0.224), 0.24],   # 1 전흉배판+가슴뿔
+	[Color(0.243, 0.153, 0.192), INK, 0.34],                          # 2 머리·다리
+	[Color(0.149, 0.169, 0.267), INK, 0.30],                          # 3 털 술
+	[INK, INK, 0.5],                                                  # 4 마디 먹선 (평면)
+	[EYE_WHITE, EYE_WHITE, 0.5],                                      # 5 흰자 (평면)
+	[EYE_PUPIL, EYE_PUPIL, 0.5],                                      # 6 동공 (평면)
+	[INK, INK, 0.5],                                                  # 7 예비
+]
+
+const CelPaletteShader := preload("res://shaders/cel_palette.gdshader")
+static var _rhino_pal_mat: ShaderMaterial
+
+## 장수풍뎅이 본체 전체가 쓰는 **머티리얼 하나**. 전 개체가 공유한다 (배칭 유지).
+static func rhino_palette_material() -> ShaderMaterial:
+	if _rhino_pal_mat == null:
+		var lights: Array = []
+		var darks: Array = []
+		var ths: Array = []
+		for row in RHINO_PAL:
+			lights.append(row[0])
+			darks.append(row[1])
+			ths.append(row[2])
+		_rhino_pal_mat = ShaderMaterial.new()
+		_rhino_pal_mat.shader = CelPaletteShader
+		_rhino_pal_mat.set_shader_parameter("pal_light", lights)
+		_rhino_pal_mat.set_shader_parameter("pal_dark", darks)
+		_rhino_pal_mat.set_shader_parameter("pal_threshold", ths)
+	return _rhino_pal_mat
+
 static func rhino_materials() -> Array:
 	if _rhino_mats.is_empty():
 		var mk := func(light: Color, dark: Color, th: float) -> ShaderMaterial:
@@ -712,21 +750,16 @@ func _apply_type() -> void:
 		if _anim != null:
 			_anim.play(&"roll")     # 콩벌레는 말린 채 굴러서 등장한다 (유저 스펙)
 	elif use_rhino:
-		# 파트가 6개(머리/가슴/배/다리 앞·중간·뒤)라 사슴벌레와 같은 방식으로 순회한다.
-		var rmats := rhino_materials()
-		for part in RHINO_PARTS:
-			var mi := rhino.find_child(String(part), true, false) as MeshInstance3D
-			if mi != null:
-				for i in mi.mesh.get_surface_count():
-					var src := mi.mesh.surface_get_material(i)
-					var slot := rhino_slot_of(src.resource_name if src != null else "")
-					if slot >= 0:
-						mi.set_surface_override_material(i, rmats[slot])
-				_flash_bodies.append(mi)
-			var rink := rhino.find_child(String(part) + "Ink", true, false) as MeshInstance3D
-			if rink != null:
-				rink.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				rink.set_surface_override_material(0, ink_material())
+		# ⚠️ 부위 6개를 각각 꽂던 방식에서 **Body/Outline 두 노드**로 바뀌었다
+		#    (rhino_v03_export.py). 색은 정점에 실린 팔레트 칸으로 간다.
+		var rbody := rhino.find_child("Body", true, false) as MeshInstance3D
+		if rbody != null:
+			rbody.set_surface_override_material(0, rhino_palette_material())
+			_flash_bodies.append(rbody)
+		var rink := rhino.find_child("Outline", true, false) as MeshInstance3D
+		if rink != null:
+			rink.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			rink.set_surface_override_material(0, ink_material())
 		_anim = rhino.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		_rhino = true
 		if _anim != null:
