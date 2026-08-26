@@ -1,4 +1,6 @@
-// 끌어당김(집결) — 충격파의 **반대편**이다. 충격파가 밖으로 부서져 나간다면
+// 회오리 = 충격파 + 인력 조합 전용 셰이더. (인력 단독은 magnet.gdshader 로 갈라졌다 —
+// 둘이 같은 그림이면 조합이 합쳐졌다는 게 안 읽힌다.)
+// 원래는 인력의 "빨려드는 나선"이었다. 충격파가 밖으로 부서져 나간다면
 // 이건 밖에서 안으로 빨려 들어온다. HoN 의 Flux(자성 히어로, pull 폴라리티)를
 // 벤치마킹했다 (유저 지시 2026-08-25).
 //
@@ -75,10 +77,16 @@ void fragment() {
 	float a = streak + core + rim;
 	if (a <= 0.004) discard;
 
-	// --- 색: 머리는 심지색 → 꼬리로 갈수록 보라 --------------------------------
+	// --- 색: **반경으로** 두 카드를 가른다 -------------------------------------
+	// ⚠️ 예전엔 밝기(hot)로 갈랐는데, 밝은 곳이 곧 머리라서 금색이 머리를 전부 덮고
+	//    청록은 알파가 0에 가까운 꼬리 끝에만 남았다 — 실측 금 74~81% / 청록 4~7% 로
+	//    "두 색을 섞었다"가 화면에서 거짓말이 됐다. 밝기가 아니라 **자리**로 갈라야
+	//    둘 다 밝은 부분을 갖는다: 바깥은 인력의 청록, 중심으로 갈수록 충격파의 금.
+	//    빨려들며 색이 달아오르는 것으로도 읽힌다.
+	vec3 tint = mix(core_col.rgb, body_col.rgb, smoothstep(0.10, 0.62, u));
 	float hot = clamp(smoothstep(dash_len * 0.55, 0.0, max(behind, 0.0)) * streak + core, 0.0, 1.0);
-	vec3 col = mix(tail_col.rgb, body_col.rgb, clamp(streak * 1.6, 0.0, 1.0));
-	col = mix(col, core_col.rgb * boost, hot);
+	vec3 col = mix(tail_col.rgb, tint, clamp(streak * 1.6, 0.0, 1.0));
+	col = mix(col, tint * boost, hot);
 
 	ALBEDO = col;
 	ALPHA = clamp(a, 0.0, 1.0) * alpha_mul;
