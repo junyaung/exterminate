@@ -433,9 +433,42 @@ var target: Node3D
 ## 화면에서 멀리 있는 벌레는 다리를 안 움직여도 티가 안 난다. 애니메이션이 프레임 비용의
 ## 대부분이라(측정: 300마리에서 애니 끄면 물리 195ms -> 4.8ms), 보이는 것만 움직인다.
 ## ⚠️ 매 프레임 검사하면 그 자체가 비용이다. 개체마다 시작 프레임을 흩어서 드문드문 본다.
-const ANIM_LOD_RADIUS := 95.0    ## 카메라가 보는 지점에서 이만큼 안쪽만 애니메이션
+## 화면 밖 여유. 1.0 이면 화면 경계에서 애니가 켜져 튀어 보인다.
+const ANIM_LOD_MARGIN := 1.25
+## 카메라를 못 읽을 때의 최후 값. 평소엔 쓰이지 않는다.
+const ANIM_LOD_FALLBACK := 60.0
 const ANIM_LOD_EVERY := 18       ## 몇 프레임마다 검사할 것인가
 var _lod_tick := 0
+
+## 애니메이션을 켜 둘 반경. **카메라에서 구한다** — 상수로 박아 두면 줌을 바꾼 순간
+## 조용히 어긋난다.
+## ⚠️ 실제로 어긋나 있었다: 95 로 박혀 있었는데 카메라가 ortho 75.5 로 줌아웃되면서
+##    이 반경이 화면보다 넓어져, **화면 밖 몹까지 전부 애니메이션이 돌고 있었다.**
+##    즉 LOD 가 사실상 꺼진 상태였다 (2026-08-25 프로파일에서 발견).
+## 전 개체가 같은 값을 쓰므로 한 번 구해 캐시한다 — 몹 수백 마리가 각자 재면 그게 비용이다.
+static var _lod_r := 0.0
+static var _lod_r_frame := -1
+
+static func _lod_radius(cam: Camera3D) -> float:
+	var f := Engine.get_process_frames()
+	if _lod_r_frame == f or (_lod_r > 0.0 and f - _lod_r_frame < 30):
+		return _lod_r
+	_lod_r_frame = f
+	if cam == null:
+		_lod_r = ANIM_LOD_FALLBACK
+		return _lod_r
+	var vp := cam.get_viewport().get_visible_rect().size
+	var aspect: float = vp.x / maxf(vp.y, 1.0)
+	if cam.projection == Camera3D.PROJECTION_ORTHOGONAL:
+		var half_h := cam.size * 0.5
+		# 지면을 비스듬히 보므로 **깊이 방향은 sin(내려보는 각)만큼 늘어난다**.
+		var dy: float = absf((-cam.global_transform.basis.z).y)
+		var depth := half_h / maxf(dy, 0.25)
+		_lod_r = maxf(half_h * aspect, depth) * ANIM_LOD_MARGIN
+	else:
+		# 원근이면 정확히 재기 어렵다 — 카메라 높이로 어림잡는다.
+		_lod_r = maxf(cam.global_position.y, 20.0) * ANIM_LOD_MARGIN
+	return _lod_r
 
 func _anim_lod() -> void:
 	if _anim == null:
@@ -452,7 +485,7 @@ func _anim_lod() -> void:
 	var d := -cam.global_transform.basis.z
 	var focus := o if absf(d.y) < 0.01 else o - d * (o.y / d.y)
 	var far: bool = Vector2(global_position.x - focus.x,
-		global_position.z - focus.z).length() > ANIM_LOD_RADIUS
+		global_position.z - focus.z).length() > _lod_radius(cam)
 	if _anim.active == far:
 		_anim.active = not far
 
@@ -749,6 +782,12 @@ func _apply_type() -> void:
 			# ⚠️ 표면 5개에 머티리얼을 하나씩 꽂던 방식에서 **머티리얼 하나**로 바뀌었다
 			#    (ant_v03_export.py). 부위 색은 정점에 실린 팔레트 칸으로 간다.
 			body.set_surface_override_material(0, ant_palette_material(type_id))
+			# ⚠️ **진짜 그림자를 끈다** (2026-08-25 최적화). 개미는 발밑 접지 타원을
+			#    따로 깔고 있어서 그림자가 두 겹이다. 게다가 태양 고도 50도 + 직교
+			#    pitch -50 이라 진짜 그림자는 대부분 몸통에 가려 보이지도 않는다
+			#    (그게 애초에 타원을 깐 이유다 — SHADOW_COL 위 주석 참고).
+			#    수가 제일 많은 몹이라 그림자 패스에서 빠지는 양이 크다.
+			body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_flash_bodies.append(body)
 		var outline := ant.find_child("Outline", true, false) as MeshInstance3D
 		if outline != null:
