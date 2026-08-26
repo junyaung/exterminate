@@ -152,6 +152,44 @@ static func type_materials(id: StringName) -> Array:
 		_materials[id] = pair
 	return _materials[id]
 
+## 개미 **팔레트판** — 표면 5개(몸통/다리/흰자/동공/마디먹선)를 머티리얼 하나로 합친다.
+## 칸 번호는 블렌더 재질 슬롯 번호와 같다 (ant_v03_export.py).
+## 개미는 스폰의 70% 라 드로우콜에 제일 크게 듣는다.
+##
+## ⚠️ 2·3·4 는 원래 unshaded 였다. **밝음 = 어두움**으로 넣어 평면색을 유지한다.
+##    장수풍뎅이와 같은 처리이고, 시간대 색조가 걸리는 것도 같다.
+## ⚠️ 색이 TYPES[id] 에서 오므로 **종류별로 캐시**한다 — 개미 모델을 쓰는 종류가
+##    늘면 색이 달라질 수 있다.
+static var _ant_pal_mats := {}
+
+static func ant_palette_material(id: StringName) -> ShaderMaterial:
+	if not _ant_pal_mats.has(id):
+		var d: Dictionary = TYPES.get(id, {})
+		var rows: Array = [
+			[d.get("color", TONE_LIGHT), d.get("dark", TONE_DARK), CEL_THRESHOLD[0]],
+			[d.get("limb", LIMB_LIGHT), d.get("limb_dark", LIMB_DARK), CEL_THRESHOLD[1]],
+			[EYE_WHITE, EYE_WHITE, 0.5],   # 2 흰자 (평면)
+			[EYE_PUPIL, EYE_PUPIL, 0.5],   # 3 동공 (평면)
+			[INK, INK, 0.5],               # 4 배 마디 먹선 (평면)
+			[INK, INK, 0.5],               # 5~7 예비
+			[INK, INK, 0.5],
+			[INK, INK, 0.5],
+		]
+		var lights: Array = []
+		var darks: Array = []
+		var ths: Array = []
+		for r in rows:
+			lights.append(r[0])
+			darks.append(r[1])
+			ths.append(r[2])
+		var m := ShaderMaterial.new()
+		m.shader = CelPaletteShader
+		m.set_shader_parameter("pal_light", lights)
+		m.set_shader_parameter("pal_dark", darks)
+		m.set_shader_parameter("pal_threshold", ths)
+		_ant_pal_mats[id] = m
+	return _ant_pal_mats[id]
+
 ## 단추 눈용 무광 unshaded 머티리얼 [흰자, 동공]. 모든 개미가 공유한다 (배칭 유지).
 static var _eye_materials: Array = []
 
@@ -708,19 +746,9 @@ func _apply_type() -> void:
 	if use_ant:
 		var body := ant.find_child("Body", true, false) as MeshInstance3D
 		if body != null:
-			var pair := type_materials(type_id)
-			for i in mini(pair.size(), body.mesh.get_surface_count()):
-				body.set_surface_override_material(i, pair[i])
-			# 서피스 2/3 = 단추 눈. 조명을 안 받는 평면 색으로 덮는다 (2026-08-15).
-			var eyes := eye_materials()
-			for i in eyes.size():
-				var s := 2 + i
-				if s < body.mesh.get_surface_count():
-					body.set_surface_override_material(s, eyes[i])
-			# 서피스 4 = 배의 마디 먹선. 셀 음영을 입히지 않는다 — 그늘진 쪽에서 선이
-			# 바탕색과 붙어 사라지면 마디가 안 읽힌다 (콩벌레와 같은 판단).
-			if body.mesh.get_surface_count() > 4:
-				body.set_surface_override_material(4, ink_material())
+			# ⚠️ 표면 5개에 머티리얼을 하나씩 꽂던 방식에서 **머티리얼 하나**로 바뀌었다
+			#    (ant_v03_export.py). 부위 색은 정점에 실린 팔레트 칸으로 간다.
+			body.set_surface_override_material(0, ant_palette_material(type_id))
 			_flash_bodies.append(body)
 		var outline := ant.find_child("Outline", true, false) as MeshInstance3D
 		if outline != null:
