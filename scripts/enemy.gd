@@ -225,6 +225,37 @@ static func blob_material(id: StringName) -> StandardMaterial3D:
 ## 색은 하나지만 경계값을 0.17 / 0.30 으로 달리 둬 다리·머리에만 그늘이 더 남는다.
 static var _pill_materials: Array = []
 
+## 콩벌레 **팔레트판** — 표면 5개(껍질/속살/흰자/동공/마디먹선)를 머티리얼 하나로.
+## 칸 번호는 블렌더 재질 슬롯 번호와 같다 (pillbug_v03_export.py).
+## ⚠️ 2·3·4 는 원래 unshaded — 밝음 = 어두움으로 넣어 평면색을 유지한다 (개미·장수풍뎅이와 같음).
+static var _pill_pal_mat: ShaderMaterial
+
+static func pillbug_palette_material() -> ShaderMaterial:
+	if _pill_pal_mat == null:
+		var shell := Color(0.745, 0.29, 0.184)    # #be4a2f
+		var shade := Color(0.451, 0.243, 0.224)   # #733e39
+		var rows: Array = [
+			[shell, shade, 0.17],          # 0 껍질
+			[shell, shade, 0.30],          # 1 속살 — 같은 쌍, 경계만 높여 그늘을 남긴다
+			[EYE_WHITE, EYE_WHITE, 0.5],   # 2 흰자 (평면)
+			[EYE_PUPIL, EYE_PUPIL, 0.5],   # 3 동공 (평면)
+			[INK, INK, 0.5],               # 4 마디 먹선 (평면)
+			[INK, INK, 0.5], [INK, INK, 0.5], [INK, INK, 0.5],
+		]
+		var lights: Array = []
+		var darks: Array = []
+		var ths: Array = []
+		for r in rows:
+			lights.append(r[0])
+			darks.append(r[1])
+			ths.append(r[2])
+		_pill_pal_mat = ShaderMaterial.new()
+		_pill_pal_mat.shader = CelPaletteShader
+		_pill_pal_mat.set_shader_parameter("pal_light", lights)
+		_pill_pal_mat.set_shader_parameter("pal_dark", darks)
+		_pill_pal_mat.set_shader_parameter("pal_threshold", ths)
+	return _pill_pal_mat
+
 static func pillbug_materials() -> Array:
 	if _pill_materials.is_empty():
 		var mk := func(light: Color, dark: Color, th: float) -> ShaderMaterial:
@@ -801,9 +832,9 @@ func _apply_type() -> void:
 	elif use_pill:
 		var pbody := pill.find_child("Body", true, false) as MeshInstance3D
 		if pbody != null:
-			var mats := pillbug_materials()
-			for i in mini(mats.size(), pbody.mesh.get_surface_count()):
-				pbody.set_surface_override_material(i, mats[i])
+			# ⚠️ 표면 5개에 하나씩 꽂던 방식에서 **머티리얼 하나**로 바뀌었다
+			#    (pillbug_v03_export.py). 부위 색은 정점에 실린 팔레트 칸으로 간다.
+			pbody.set_surface_override_material(0, pillbug_palette_material())
 			_flash_bodies.append(pbody)
 		var poutline := pill.find_child("Outline", true, false) as MeshInstance3D
 		if poutline != null:
